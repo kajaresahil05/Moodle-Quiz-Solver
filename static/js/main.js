@@ -111,19 +111,57 @@ async function pollNotifications() {
 function initSidebarToggle() {
     const toggle = document.getElementById('menu-toggle');
     const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
     if (!toggle || !sidebar) return;
 
-    toggle.addEventListener('click', () => {
-        sidebar.classList.toggle('open');
+    function openSidebar() {
+        sidebar.classList.add('open');
+        if (backdrop) backdrop.classList.add('active');
+        document.body.classList.add('sidebar-open');
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        if (backdrop) backdrop.classList.remove('active');
+        document.body.classList.remove('sidebar-open');
+    }
+
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (sidebar.classList.contains('open')) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
+    });
+
+    if (backdrop) {
+        backdrop.addEventListener('click', closeSidebar);
+    }
+
+    // Close sidebar when clicking any navigation link on mobile
+    sidebar.querySelectorAll('.sidebar-link').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 1024) {
+                closeSidebar();
+            }
+        });
     });
 
     // Close sidebar on outside click (mobile)
     document.addEventListener('click', (e) => {
-        if (window.innerWidth <= 768 && 
+        if (window.innerWidth <= 1024 &&
             sidebar.classList.contains('open') &&
             !sidebar.contains(e.target) &&
             !toggle.contains(e.target)) {
-            sidebar.classList.remove('open');
+            closeSidebar();
+        }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+            closeSidebar();
         }
     });
 }

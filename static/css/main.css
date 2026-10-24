@@ -1678,3 +1678,423 @@ ul { list-style: none; }
     color: var(--accent-red);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Mobile & Responsive Design System
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Sidebar Backdrop ───────────────────────────────────────── */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 14, 26, 0.75);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 1040;
+    opacity: 0;
+    transition: opacity var(--transition-slow);
+    pointer-events: none;
+}
+
+.sidebar-backdrop.active {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* ─── Tablet & Below (<= 1024px) ────────────────────────────── */
+@media screen and (max-width: 1024px) {
+    :root {
+        --sidebar-width: 0px;
+        --content-pad: 20px;
+    }
+
+    .menu-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        cursor: pointer;
+    }
+
+    .sidebar {
+        transform: translateX(-100%);
+        width: 270px;
+        z-index: 1050;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stats-grid--compact {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ─── Mobile Devices (<= 768px) ─────────────────────────────── */
+@media screen and (max-width: 768px) {
+    :root {
+        --content-pad: 14px;
+        --topbar-height: 56px;
+    }
+
+    html, body {
+        overflow-x: hidden;
+        overflow-y: auto;
+        height: auto;
+        min-height: 100%;
+        display: block;
+    }
+
+    body.sidebar-open {
+        overflow: hidden;
+    }
+
+    .main-content {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .page-content {
+        padding: var(--content-pad);
+        overflow: visible;
+        flex: 1;
+    }
+
+    /* Topbar compact */
+    .topbar {
+        padding: 0 12px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        gap: 8px;
+    }
+
+    .topbar-left {
+        gap: 10px;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .breadcrumb {
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 140px;
+    }
+
+    .topbar-right {
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .user-topbar-pill {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+
+    .user-pill-text {
+        max-width: 110px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: inline-block;
+    }
+
+    .btn-logout span {
+        display: none;
+    }
+
+    .btn-logout {
+        padding: 6px 8px;
+    }
+
+    /* Dashboard header */
+    .dashboard-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+        margin-bottom: 18px;
+    }
+
+    .dashboard-title h1 {
+        font-size: 20px;
+        line-height: 1.25;
+    }
+
+    .subtitle {
+        font-size: 12px;
+    }
+
+    #new-workflow-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px;
+        font-size: 14px;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .stats-grid--compact {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .stat-card {
+        padding: 12px 14px;
+        gap: 10px;
+    }
+
+    .stat-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .stat-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .stat-value {
+        font-size: 20px;
+    }
+
+    .stat-label {
+        font-size: 10px;
+    }
+
+    /* Cards */
+    .card {
+        margin-bottom: 16px;
+        border-radius: var(--radius-md);
+    }
+
+    .card-header {
+        padding: 14px 16px;
+    }
+
+    .card-body {
+        padding: 16px;
+    }
+
+    /* Table mobile scroll */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: var(--radius-sm);
+        margin: 0 -4px;
+        padding: 0 4px;
+    }
+
+    .data-table th, .data-table td {
+        padding: 10px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    /* Modal Mobile */
+    .modal-overlay {
+        padding: 10px;
+        align-items: flex-end;
+    }
+
+    .modal {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 88vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        margin: 0;
+        overflow-y: auto;
+        padding: 20px 16px;
+    }
+
+    .modal-radio-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .modal-footer {
+        flex-direction: column-reverse;
+        gap: 8px;
+        margin-top: 20px;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px;
+    }
+
+    /* Notification Dropdown Mobile */
+    .notif-dropdown {
+        position: fixed;
+        top: 60px;
+        left: 10px;
+        right: 10px;
+        width: auto;
+        max-width: none;
+    }
+
+    /* Login Page Mobile */
+    .login-body {
+        padding: 24px 14px;
+        align-items: center;
+    }
+
+    .login-container {
+        max-width: 100%;
+        width: 100%;
+        padding: 0;
+    }
+
+    .login-brand {
+        margin-bottom: 20px;
+    }
+
+    .login-brand-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+    }
+
+    .login-title {
+        font-size: 22px;
+    }
+
+    .login-card {
+        padding: 24px 18px;
+        border-radius: var(--radius-lg);
+    }
+
+    .login-card-header h2 {
+        font-size: 17px;
+    }
+
+    /* Prevent iOS auto-zoom on input focus */
+    .form-input, input[type="text"], input[type="password"] {
+        font-size: 16px !important;
+        height: 46px;
+    }
+
+    .btn-lg {
+        padding: 12px 18px;
+        font-size: 15px;
+        height: 48px;
+    }
+
+    .login-features {
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .login-feature-item {
+        font-size: 11px;
+    }
+
+    /* Workflow Detail Mobile */
+    .workflow-detail-header {
+        margin-bottom: 16px;
+    }
+
+    .wf-title-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .wf-title-row h1 {
+        font-size: 18px;
+    }
+
+    .wf-actions {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .wf-actions .btn {
+        flex: 1;
+        justify-content: center;
+        padding: 10px;
+    }
+
+    .wf-url-box {
+        padding: 10px 12px;
+        font-size: 11px;
+        word-break: break-all;
+    }
+
+    /* Settings Page Mobile */
+    .settings-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 12px 0;
+    }
+
+    .setting-label {
+        font-size: 12px;
+    }
+
+    .setting-value {
+        width: 100%;
+    }
+
+    .setting-value .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ─── Ultra Small Mobile (<= 400px) ─────────────────────────── */
+@media screen and (max-width: 400px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-grid--compact {
+        grid-template-columns: 1fr;
+    }
+
+    .topbar-left {
+        gap: 6px;
+    }
+
+    .breadcrumb {
+        max-width: 90px;
+    }
+
+    .user-topbar-pill {
+        display: none;
+    }
+
+    .login-card {
+        padding: 20px 14px;
+    }
+}
+
