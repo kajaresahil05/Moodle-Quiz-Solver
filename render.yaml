@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: moodle-quiz-assistant
+    runtime: docker
+    plan: free
+    region: oregon
+    envVars:
+      - key: BROWSER_HEADLESS
+        value: "true"
+      - key: APP_HOST
+        value: "0.0.0.0"
+      - key: APP_PORT
+        value: "10000"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: "gemini-3.5-flash-lite"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: "openai/gpt-oss-120b"

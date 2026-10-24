@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% block title %}Settings — Moodle Quiz Assistant{% endblock %}
+{% block breadcrumb %}Settings{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="dashboard-title">
+        <h1>Settings</h1>
+        <p class="subtitle">Configure API keys, browser options, and system preferences</p>
+    </div>
+</div>
+
+<div class="settings-grid">
+    <!-- Active Moodle Account -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                Active Moodle Account
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="settings-row">
+                <div class="setting-label">Logged-in Moodle ID</div>
+                <div class="setting-value monospace">
+                    {% if current_user and current_user.moodle_id %}
+                    <strong style="color: var(--accent-cyan);">{{ current_user.moodle_id }}</strong>
+                    {% else %}
+                    <span class="text-muted">Not logged in</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Account Action</div>
+                <div class="setting-value">
+                    <a href="/logout" class="btn btn-ghost btn-sm btn-danger">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <polyline points="16 17 21 12 16 7"/>
+                            <line x1="21" y1="12" x2="9" y2="12"/>
+                        </svg>
+                        Switch Account / Sign Out
+                    </a>
+                </div>
+            </div>
+            <div class="info-banner info-banner--blue">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Your Moodle credentials were provided via the login page. Each user can log in with their own Moodle ID and password.
+            </div>
+        </div>
+    </div>
+
+    <!-- Gemini AI Configuration -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                </svg>
+                Gemini AI Configuration
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="settings-row">
+                <div class="setting-label">API Key Status</div>
+                <div class="setting-value">
+                    {% if gemini_configured %}
+                    <span class="status-badge status-completed">✓ Configured</span>
+                    {% else %}
+                    <span class="status-badge status-failed">✗ Not configured</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Active Model</div>
+                <div class="setting-value monospace">{{ gemini_model }}</div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Connection Test</div>
+                <div class="setting-value">
+                    <button class="btn btn-ghost btn-sm" onclick="testGemini()" id="test-gemini-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 11 12 14 22 4"/>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        </svg>
+                        Test Connection
+                    </button>
+                    <span id="gemini-test-result"></span>
+                </div>
+            </div>
+
+            <div class="info-banner info-banner--blue">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Primary provider for answering quiz questions. Configured in <code>.env</code> via <code>GEMINI_API_KEY</code>.
+            </div>
+        </div>
+    </div>
+
+    <!-- Groq AI Fallback -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+                Groq AI Fallback (Level 1)
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="settings-row">
+                <div class="setting-label">API Status</div>
+                <div class="setting-value">
+                    {% if groq_configured %}
+                    <span class="status-badge status-completed">✓ Configured</span>
+                    {% else %}
+                    <span class="status-badge status-failed">✗ Not configured</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Model</div>
+                <div class="setting-value monospace">{{ groq_model }}</div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Connection Test</div>
+                <div class="setting-value">
+                    <button class="btn btn-ghost btn-sm" onclick="testGroq()" id="test-groq-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 11 12 14 22 4"/>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        </svg>
+                        Test Groq
+                    </button>
+                    <span id="groq-test-result"></span>
+                </div>
+            </div>
+            <div class="info-banner info-banner--orange">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Automatically triggered when Gemini hits quota / rate limits (429 or 503 errors).
+            </div>
+        </div>
+    </div>
+
+    <!-- Ollama Local Fallback -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                Ollama Local Fallback (Level 2)
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="settings-row">
+                <div class="setting-label">Local Endpoint</div>
+                <div class="setting-value monospace">{{ ollama_base_url }}</div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Model</div>
+                <div class="setting-value monospace">{{ ollama_model }}</div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Server Test</div>
+                <div class="setting-value">
+                    <button class="btn btn-ghost btn-sm" onclick="testOllama()" id="test-ollama-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 11 12 14 22 4"/>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        </svg>
+                        Test Ollama
+                    </button>
+                    <span id="ollama-test-result"></span>
+                </div>
+            </div>
+            <div class="info-banner info-banner--green">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                100% offline fallback. If you have Ollama installed, start it with <code>ollama run {{ ollama_model }}</code>.
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                Browser Settings
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="settings-row">
+                <div class="setting-label">Headless Mode</div>
+                <div class="setting-value">
+                    {% if browser_headless %}
+                    <span class="badge badge--green">Enabled</span>
+                    {% else %}
+                    <span class="badge badge--blue">Disabled (visible)</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Browser</div>
+                <div class="setting-value">Chromium (via Playwright)</div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Session</div>
+                <div class="setting-value">Uses your existing Moodle login session</div>
+            </div>
+            <div class="info-banner info-banner--orange">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                </svg>
+                The browser window will open so you can log in to Moodle. Do not close it while workflows are running.
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+                Database
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="settings-row">
+                <div class="setting-label">Database</div>
+                <div class="setting-value monospace">SQLite (quiz_assistant.db)</div>
+            </div>
+            <div class="settings-row">
+                <div class="setting-label">Health</div>
+                <div class="setting-value" id="db-health">
+                    <button class="btn btn-ghost btn-sm" onclick="checkHealth()">Check</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                Security Notes
+            </h2>
+        </div>
+        <div class="card-body">
+            <ul class="settings-notes">
+                <li>API keys are never stored in the database or logs</li>
+                <li>Session tokens and cookies are never stored</li>
+                <li>Only sanitized quiz URLs (attempt ID, cmid) are persisted</li>
+                <li>Practice mode requires explicit confirmation for auto-submit</li>
+                <li>Graded assessments should never use auto-submit</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function testGemini() {
+        const btn = document.getElementById('test-gemini-btn');
+        const result = document.getElementById('gemini-test-result');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Testing...';
+        result.textContent = '';
+        
+        try {
+            const res = await fetch('/api/test-gemini', { method: 'POST' });
+            const data = await res.json();
+            result.innerHTML = data.success 
+                ? '<span class="status-badge status-completed">✓ Connected</span>'
+                : `<span class="status-badge status-failed">✗ ${data.message}</span>`;
+        } catch (err) {
+            result.innerHTML = `<span class="status-badge status-failed">✗ Network error</span>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Test Connection`;
+        }
+    }
+
+    async function testGroq() {
+        const btn = document.getElementById('test-groq-btn');
+        const result = document.getElementById('groq-test-result');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Testing...';
+        result.textContent = '';
+        
+        try {
+            const res = await fetch('/api/test-groq', { method: 'POST' });
+            const data = await res.json();
+            result.innerHTML = data.success 
+                ? `<span class="status-badge status-completed">✓ ${data.message}</span>`
+                : `<span class="status-badge status-failed">✗ ${data.message}</span>`;
+        } catch (err) {
+            result.innerHTML = `<span class="status-badge status-failed">✗ Network error</span>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Test Groq`;
+        }
+    }
+
+    async function testOllama() {
+        const btn = document.getElementById('test-ollama-btn');
+        const result = document.getElementById('ollama-test-result');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Testing...';
+        result.textContent = '';
+        
+        try {
+            const res = await fetch('/api/test-ollama', { method: 'POST' });
+            const data = await res.json();
+            result.innerHTML = data.success 
+                ? `<span class="status-badge status-completed">✓ ${data.message}</span>`
+                : `<span class="status-badge status-failed">✗ ${data.message}</span>`;
+        } catch (err) {
+            result.innerHTML = `<span class="status-badge status-failed">✗ Network error</span>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Test Ollama`;
+        }
+    }
+
+    async function checkHealth() {
+        const el = document.getElementById('db-health');
+        try {
+            const res = await fetch('/api/health');
+            const data = await res.json();
+            el.innerHTML = data.database_ok 
+                ? '<span class="status-badge status-completed">✓ OK</span>'
+                : '<span class="status-badge status-failed">✗ Error</span>';
+        } catch (err) {
+            el.innerHTML = '<span class="status-badge status-failed">✗ Unreachable</span>';
+        }
+    }
+</script>
+{% endblock %}

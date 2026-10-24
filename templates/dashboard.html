@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Moodle Quiz Assistant{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="dashboard-title">
+        <h1>Quiz Automation Dashboard</h1>
+        <p class="subtitle">AI-powered assistance for your Moodle practice quizzes</p>
+    </div>
+    <button class="btn btn-primary" id="new-workflow-btn" onclick="openNewWorkflowModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        New Workflow
+    </button>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon stat-icon--blue">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 11l3 3L22 4"/>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-total">{{ workflows|length }}</div>
+            <div class="stat-label">Total Workflows</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon stat-icon--green">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-running">{{ workflows|selectattr('state', 'equalto', 'running')|list|length }}</div>
+            <div class="stat-label">Running</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon stat-icon--purple">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-completed">{{ workflows|selectattr('state', 'equalto', 'completed')|list|length }}</div>
+            <div class="stat-label">Completed</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon stat-icon--orange">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-failed">{{ workflows|selectattr('state', 'equalto', 'failed')|list|length }}</div>
+            <div class="stat-label">Failed</div>
+        </div>
+    </div>
+</div>
+
+<!-- Workflows Table -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recent Workflows</h2>
+        <button class="btn btn-ghost btn-sm" onclick="refreshWorkflows()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/>
+                <polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Refresh
+        </button>
+    </div>
+    <div class="card-body">
+        {% if workflows %}
+        <div class="table-container">
+            <table class="data-table" id="workflows-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Quiz URL</th>
+                        <th>Mode</th>
+                        <th>Status</th>
+                        <th>Progress</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for wf in workflows %}
+                    <tr id="row-{{ wf.workflow_id }}" data-workflow-id="{{ wf.workflow_id }}">
+                        <td>
+                            <a href="/workflow/{{ wf.workflow_id }}" class="link-primary monospace">
+                                {{ wf.workflow_id[:8] }}...
+                            </a>
+                        </td>
+                        <td>
+                            <span class="url-text" title="{{ wf.quiz_url }}">
+                                {{ wf.quiz_url[:50] }}{% if wf.quiz_url|length > 50 %}...{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge--{{ 'blue' if wf.mode.value == 'practice' else 'purple' }}">
+                                {{ wf.mode.value }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-badge status-{{ wf.state.value }}" id="status-{{ wf.workflow_id }}">
+                                {% if wf.state.value == 'running' %}
+                                <span class="pulse-dot"></span>
+                                {% endif %}
+                                {{ wf.state.value }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="progress-cell">
+                                <div class="progress-bar-mini">
+                                    <div class="progress-fill"
+                                         style="width: {{ ((wf.answered_questions / wf.total_questions * 100) if wf.total_questions > 0 else 0)|int }}%">
+                                    </div>
+                                </div>
+                                <span class="progress-text">
+                                    {{ wf.answered_questions }}/{{ wf.total_questions }}
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date-text">{{ wf.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </td>
+                        <td>
+                            <div class="action-group">
+                                <a href="/workflow/{{ wf.workflow_id }}" class="btn btn-ghost btn-xs" title="View details">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </a>
+                                {% if wf.state.value == 'running' %}
+                                <button class="btn btn-ghost btn-xs btn-danger" 
+                                        onclick="stopWorkflow('{{ wf.workflow_id }}')" title="Stop">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                    </svg>
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-ghost btn-xs btn-danger"
+                                        onclick="deleteWorkflow('{{ wf.workflow_id }}')" title="Delete">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"/>
+                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                        <path d="M10 11v6M14 11v6"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 11l3 3L22 4"/>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+            </div>
+            <h3>No workflows yet</h3>
+            <p>Start your first quiz automation workflow by clicking "New Workflow"</p>
+            <button class="btn btn-primary" onclick="openNewWorkflowModal()">Create Workflow</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- New Workflow Modal -->
+<div class="modal-overlay" id="workflow-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modal-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+                New Quiz Workflow
+            </h2>
+            <button class="modal-close" onclick="closeNewWorkflowModal()" aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <form id="workflow-form" onsubmit="submitWorkflow(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="quiz-url" class="form-label">Moodle Quiz URL <span class="required">*</span></label>
+                    <input 
+                        type="url" 
+                        id="quiz-url" 
+                        name="quiz_url"
+                        class="form-input" 
+                        placeholder="https://elearn.example.edu/moodle/mod/quiz/attempt.php?attempt=..."
+                        required
+                        autocomplete="off"
+                    >
+                    <span class="form-hint">The full URL of an active Moodle quiz attempt page</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Execution Mode <span class="required">*</span></label>
+                    <div class="mode-cards">
+                        <label class="mode-card" for="mode-practice">
+                            <input type="radio" id="mode-practice" name="mode" value="practice" checked>
+                            <div class="mode-card-content">
+                                <div class="mode-icon mode-icon--blue">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 11l3 3L22 4"/>
+                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                                    </svg>
+                                </div>
+                                <div class="mode-info">
+                                    <div class="mode-name">Practice Mode</div>
+                                    <div class="mode-desc">Automatically selects AI-suggested answers on ungraded quizzes</div>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="mode-card" for="mode-review">
+                            <input type="radio" id="mode-review" name="mode" value="review">
+                            <div class="mode-card-content">
+                                <div class="mode-icon mode-icon--purple">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </div>
+                                <div class="mode-info">
+                                    <div class="mode-name">Review Mode</div>
+                                    <div class="mode-desc">Shows AI suggestions only — never clicks or modifies answers</div>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="auto-submit-group">
+                    <label class="checkbox-label" for="auto-submit">
+                        <input type="checkbox" id="auto-submit" name="auto_submit">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">
+                            Auto-submit after all questions answered
+                            <span class="badge badge--orange badge--sm">Practice only</span>
+                        </span>
+                    </label>
+                    <span class="form-hint warning-hint">
+                        ⚠️ Only enable for authorized practice quizzes. Submission cannot be undone.
+                    </span>
+                </div>
+
+                <div class="info-banner">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    You must be logged in to Moodle in the browser window. This tool will use your existing session.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="closeNewWorkflowModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="submit-workflow-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Start Workflow
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Auto-refresh running workflows
+    let autoRefreshInterval = null;
+
+    function startAutoRefresh() {
+        autoRefreshInterval = setInterval(refreshWorkflows, 5000);
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+
+    function openNewWorkflowModal() {
+        document.getElementById('workflow-modal').classList.add('active');
+        document.getElementById('quiz-url').focus();
+    }
+
+    function closeNewWorkflowModal() {
+        document.getElementById('workflow-modal').classList.remove('active');
+        document.getElementById('workflow-form').reset();
+    }
+
+    // Close modal on overlay click
+    document.getElementById('workflow-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeNewWorkflowModal();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeNewWorkflowModal();
+    });
+
+    // Toggle auto-submit for review mode
+    document.querySelectorAll('input[name="mode"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const autoSubmitGroup = document.getElementById('auto-submit-group');
+            autoSubmitGroup.style.opacity = this.value === 'review' ? '0.4' : '1';
+            if (this.value === 'review') {
+                document.getElementById('auto-submit').checked = false;
+                document.getElementById('auto-submit').disabled = true;
+            } else {
+                document.getElementById('auto-submit').disabled = false;
+            }
+        });
+    });
+
+    async function submitWorkflow(e) {
+        e.preventDefault();
+        const btn = document.getElementById('submit-workflow-btn');
+        const url = document.getElementById('quiz-url').value.trim();
+        const mode = document.querySelector('input[name="mode"]:checked').value;
+        const autoSubmit = document.getElementById('auto-submit').checked;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Starting...';
+
+        try {
+            const res = await fetch('/api/workflows', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ quiz_url: url, mode: mode, auto_submit: autoSubmit })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                showToast('success', 'Workflow Started', `Workflow ${data.workflow_id.substring(0, 8)} started`);
+                closeNewWorkflowModal();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', 'Error', data.detail || data.message || 'Failed to start workflow');
+            }
+        } catch (err) {
+            showToast('error', 'Network Error', err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Workflow';
+        }
+    }
+
+    async function stopWorkflow(id) {
+        if (!confirm('Stop this workflow?')) return;
+        try {
+            const res = await fetch(`/api/workflows/${id}/stop`, { method: 'POST' });
+            const data = await res.json();
+            showToast(data.success ? 'success' : 'warning', 'Workflow', data.message);
+            setTimeout(() => location.reload(), 1000);
+        } catch (err) {
+            showToast('error', 'Error', err.message);
+        }
+    }
+
+    async function deleteWorkflow(id) {
+        if (!confirm('Delete this workflow and all its data? This cannot be undone.')) return;
+        try {
+            const res = await fetch(`/api/workflows/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                const row = document.getElementById(`row-${id}`);
+                if (row) row.remove();
+                showToast('success', 'Deleted', 'Workflow deleted');
+            }
+        } catch (err) {
+            showToast('error', 'Error', err.message);
+        }
+    }
+
+    async function refreshWorkflows() {
+        try {
+            const res = await fetch('/api/workflows');
+            const workflows = await res.json();
+            // Update status badges for each workflow
+            workflows.forEach(wf => {
+                const badge = document.getElementById(`status-${wf.workflow_id}`);
+                if (badge) {
+                    badge.className = `status-badge status-${wf.state}`;
+                    badge.textContent = wf.state;
+                }
+            });
+        } catch (err) {
+            // Silently fail
+        }
+    }
+
+    // Start auto-refresh
+    startAutoRefresh();
+</script>
+{% endblock %}

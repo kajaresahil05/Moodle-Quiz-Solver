@@ -1,0 +1,24 @@
+# Environment & Secrets (NEVER COMMIT)
+.env
+*.env
+*.env.local
+
+# Database & Logs
+quiz_assistant.db
+quiz_assistant.db-journal
+quiz_assistant.log
+*.log
+
+# Python Virtual Environments & Caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE & OS Files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

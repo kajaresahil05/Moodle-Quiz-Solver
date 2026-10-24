@@ -1,0 +1,14 @@
+.git
+.gitignore
+venv
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+quiz_assistant.log
+quiz_assistant.db
+.env
+.idea
+.vscode
