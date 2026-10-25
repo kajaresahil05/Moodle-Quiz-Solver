@@ -15,7 +15,7 @@
                     {% if workflow.state.value == 'running' %}<span class="pulse-dot"></span>{% endif %}
                     {{ workflow.state.value }}
                 </span>
-                <span class="date-text">Created {{ workflow.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                <span class="date-text" data-utc="{{ workflow.created_at.isoformat() if workflow.created_at else '' }}">Created {{ workflow.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
         </div>
         <div class="wf-actions">
@@ -200,7 +200,7 @@
                 <div class="event-content">
                     <div class="event-type">{{ event.event_type }}</div>
                     <div class="event-message">{{ event.message[:100] }}</div>
-                    <div class="event-time">{{ event.created_at.strftime('%H:%M:%S') }}</div>
+                    <div class="event-time" data-utc="{{ event.created_at.isoformat() if event.created_at else '' }}">{{ event.created_at.strftime('%H:%M:%S') }}</div>
                 </div>
             </div>
             {% endfor %}
@@ -303,7 +303,7 @@
                             <div class="event-content">
                                 <div class="event-type">${e.event_type}</div>
                                 <div class="event-message">${escapeHtml(e.message.substring(0, 100))}</div>
-                                <div class="event-time">${new Date(e.timestamp).toLocaleTimeString()}</div>
+                                <div class="event-time">${formatLocalTime(e.timestamp)}</div>
                             </div>
                         </div>
                     `).join('');
@@ -339,6 +339,34 @@
             showToast('error', 'Error', err.message);
         }
     }
+
+    function formatLocalTime(isoStr) {
+        if (!isoStr) return '';
+        if (!isoStr.endsWith('Z') && !isoStr.includes('+')) isoStr += 'Z';
+        const d = new Date(isoStr);
+        return isNaN(d) ? isoStr : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    }
+
+    function formatLocalDateTime(isoStr) {
+        if (!isoStr) return '';
+        if (!isoStr.endsWith('Z') && !isoStr.includes('+')) isoStr += 'Z';
+        const d = new Date(isoStr);
+        return isNaN(d) ? isoStr : d.toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Convert initial server-rendered UTC timestamps to local browser timezone
+    function updateLocalTimes() {
+        document.querySelectorAll('.event-time[data-utc]').forEach(el => {
+            const utc = el.getAttribute('data-utc');
+            if (utc) el.textContent = formatLocalTime(utc);
+        });
+        document.querySelectorAll('.date-text[data-utc]').forEach(el => {
+            const utc = el.getAttribute('data-utc');
+            if (utc) el.textContent = 'Created ' + formatLocalDateTime(utc);
+        });
+    }
+
+    updateLocalTimes();
 
     // Auto refresh if running
     {% if workflow.state.value == 'running' %}

@@ -136,7 +136,7 @@
                             </div>
                         </td>
                         <td>
-                            <span class="date-text">{{ wf.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span class="date-text" data-utc="{{ wf.created_at.isoformat() if wf.created_at else '' }}">{{ wf.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
                         </td>
                         <td>
                             <div class="action-group">
@@ -417,6 +417,18 @@
             // Silently fail
         }
     }
+
+    // Convert UTC timestamps to local browser timezone
+    document.querySelectorAll('.date-text[data-utc]').forEach(el => {
+        let utc = el.getAttribute('data-utc');
+        if (utc) {
+            if (!utc.endsWith('Z') && !utc.includes('+')) utc += 'Z';
+            const d = new Date(utc);
+            if (!isNaN(d)) {
+                el.textContent = d.toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+            }
+        }
+    });
 
     // Start auto-refresh
     startAutoRefresh();

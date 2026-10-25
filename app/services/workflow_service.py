@@ -271,7 +271,7 @@ async def _run_workflow(
                             workflow_id,
                             WorkflowUpdate(answered_questions=total_answered),
                         )
-                    await asyncio.sleep(3.5)  # Pause to avoid rate limits and simulate natural timing
+                    await asyncio.sleep(1.2)  # Natural pause between questions
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
@@ -286,7 +286,7 @@ async def _run_workflow(
                 if not finished:
                     break
             page_num += 1
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
 
         # Handle summary page and auto-submit
         page = await browser_service.get_active_page()

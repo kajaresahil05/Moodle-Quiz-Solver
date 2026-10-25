@@ -9,7 +9,7 @@ import logging
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator, List, Optional
 
@@ -23,6 +23,19 @@ from app.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    """Return current UTC time as an ISO string with timezone offset."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_utc_datetime(dt_str: str) -> datetime:
+    """Parse ISO datetime string, ensuring it is timezone-aware UTC."""
+    dt = datetime.fromisoformat(dt_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def _get_db_path() -> str:
@@ -122,7 +135,7 @@ def create_workflow(
     mode: str,
     auto_submit: bool = False,
 ) -> WorkflowRecord:
-    now = datetime.utcnow().isoformat()
+    now = _now_iso()
     wid = str(uuid.uuid4())
     # Sanitize URL: strip query params that may contain session data
     sanitized_url = _sanitize_url(quiz_url)
@@ -182,7 +195,7 @@ def update_workflow(workflow_id: str, update: WorkflowUpdate) -> Optional[Workfl
         return get_workflow(workflow_id)
 
     fields.append("updated_at = ?")
-    params.append(datetime.utcnow().isoformat())
+    params.append(_now_iso())
     params.append(workflow_id)
 
     with get_connection() as conn:
@@ -221,7 +234,7 @@ def save_question_record(
     answered: bool,
     ai_provider: str = "Gemini",
 ) -> QuestionRecord:
-    now = datetime.utcnow().isoformat()
+    now = _now_iso()
     rid = str(uuid.uuid4())
     with get_connection() as conn:
         conn.execute(
@@ -285,7 +298,7 @@ def log_event(
     event_type: str,
     message: str,
 ) -> EventRecord:
-    now = datetime.utcnow().isoformat()
+    now = _now_iso()
     eid = str(uuid.uuid4())
     with get_connection() as conn:
         conn.execute(
@@ -297,7 +310,7 @@ def log_event(
         workflow_id=workflow_id,
         event_type=event_type,
         message=message,
-        created_at=datetime.fromisoformat(now),
+        created_at=_parse_utc_datetime(now),
     )
 
 
@@ -313,7 +326,7 @@ def list_events(workflow_id: str, limit: int = 100) -> List[EventRecord]:
             workflow_id=r["workflow_id"],
             event_type=r["event_type"],
             message=r["message"],
-            created_at=datetime.fromisoformat(r["created_at"]),
+            created_at=_parse_utc_datetime(r["created_at"]),
         )
         for r in rows
     ]
@@ -340,8 +353,8 @@ def _row_to_workflow(row: sqlite3.Row) -> WorkflowRecord:
         mode=row["mode"],
         state=row["state"],
         auto_submit=bool(row["auto_submit"]),
-        created_at=datetime.fromisoformat(row["created_at"]),
-        updated_at=datetime.fromisoformat(row["updated_at"]),
+        created_at=_parse_utc_datetime(row["created_at"]),
+        updated_at=_parse_utc_datetime(row["updated_at"]),
         error_message=row["error_message"],
         total_questions=row["total_questions"],
         answered_questions=row["answered_questions"],
@@ -364,7 +377,7 @@ def _row_to_question_record(row: sqlite3.Row) -> QuestionRecord:
         confidence=row["confidence"],
         is_ambiguous=bool(row["is_ambiguous"]),
         answered=bool(row["answered"]),
-        created_at=datetime.fromisoformat(row["created_at"]),
+        created_at=_parse_utc_datetime(row["created_at"]),
         ai_provider=row["ai_provider"] if ("ai_provider" in keys and row["ai_provider"]) else "Gemini",
     )
 

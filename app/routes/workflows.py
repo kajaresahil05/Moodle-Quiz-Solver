@@ -23,6 +23,15 @@ from app.models import (
 from app.services import auth_service, workflow_service
 
 logger = logging.getLogger(__name__)
+
+
+def _format_iso(dt) -> str:
+    """Format datetime as UTC ISO string with explicit timezone suffix."""
+    if not dt:
+        return ""
+    if dt.tzinfo:
+        return dt.isoformat()
+    return f"{dt.isoformat()}Z"
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
 
@@ -99,7 +108,7 @@ async def get_workflow_status(workflow_id: str):
             {
                 "event_type": e.event_type,
                 "message": e.message,
-                "timestamp": e.created_at.isoformat(),
+                "timestamp": _format_iso(e.created_at),
             }
             for e in events
         ],
@@ -181,7 +190,7 @@ async def get_workflow_events(workflow_id: str, limit: int = 50):
                 "event_id": e.event_id,
                 "event_type": e.event_type,
                 "message": e.message,
-                "timestamp": e.created_at.isoformat(),
+                "timestamp": _format_iso(e.created_at),
             }
             for e in events
         ],
