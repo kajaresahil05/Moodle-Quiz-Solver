@@ -157,6 +157,15 @@ async def _run_workflow(
                 db.log_event(workflow_id, "error", "Login required - user must log in to Moodle")
                 return
 
+        # If currently on an enrolment page, attempt self-enrolment
+        if "/enrol/" in page.url:
+            enrolled = await browser_service.check_and_handle_course_enrolment(page)
+            if enrolled:
+                db.log_event(workflow_id, "info", "Self-enrolment submitted, navigating to quiz")
+                await browser_service.navigate_to(clean_url)
+                await asyncio.sleep(2)
+                page = await browser_service.get_active_page()
+
         # If currently on a view page, course page, or start page, attempt to start/continue the quiz
         await browser_service.check_and_start_attempt_if_view_page(page)
         page = await browser_service.get_active_page()
@@ -185,6 +194,15 @@ async def _run_workflow(
                 error_msg = "Quiz attempt already completed/finished. No active attempts remaining for this quiz."
             elif "review.php" in page.url:
                 error_msg = "Quiz attempt is already completed/finished (review URL provided)."
+            elif "/enrol/" in page.url:
+                course_match = re.search(r'[?&]id=(\d+)', page.url)
+                cid = f"Course #{course_match.group(1)}" if course_match else "this course"
+                if "cannot enrol" in body_text.lower():
+                    error_msg = f"Course enrolment required: Your Moodle account is not enrolled in {cid}, and self-enrolment is not allowed. Please contact your instructor or verify your Moodle credentials."
+                elif "enrolment key" in body_text.lower() or "password" in body_text.lower():
+                    error_msg = f"Course enrolment key required: {cid} requires an enrolment key. Please enrol in the course first in Moodle."
+                else:
+                    error_msg = f"Course enrolment required: Your logged-in Moodle account is not enrolled in {cid}. Please enrol in the course first or check your Moodle credentials."
             elif "closed on" in body_text.lower() or "quiz closed" in body_text.lower():
                 error_msg = "Quiz has already closed and is no longer accepting attempts."
             elif "not be available until" in body_text.lower() or "not currently available" in body_text.lower():

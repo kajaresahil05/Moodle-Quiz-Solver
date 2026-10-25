@@ -288,6 +288,51 @@ async def check_is_moodle_quiz(page=None) -> bool:
     return False
 
 
+async def check_and_handle_course_enrolment(page=None) -> bool:
+    """
+    If currently redirected to a course enrolment page (/enrol/index.php),
+    check if self-enrolment is available (an 'Enrol me' button) and click it.
+    Returns True if self-enrolment was clicked and submitted.
+    """
+    if page is None:
+        page = await get_active_page()
+    url = page.url.lower()
+    if "/enrol/index.php" not in url and "/enrol/" not in url:
+        return False
+
+    try:
+        # Look for "Enrol me" button
+        enrol_selectors = [
+            'input[type="submit"][value*="Enrol me" i]',
+            'button:has-text("Enrol me")',
+            'button:has-text("Enrol")',
+            'input[type="submit"][value*="Enrol" i]',
+            'form[action*="enrol"] input[type="submit"]',
+            'form[action*="enrol"] button',
+        ]
+
+        enrol_btn = None
+        for sel in enrol_selectors:
+            el = await page.query_selector(sel)
+            if el and await el.is_visible():
+                enrol_btn = el
+                break
+
+        if enrol_btn:
+            logger.info("Found 'Enrol me' button on course enrolment page, clicking it")
+            await enrol_btn.click()
+            try:
+                await page.wait_for_load_state("domcontentloaded", timeout=10000)
+            except Exception:
+                pass
+            await asyncio.sleep(2)
+            return True
+    except Exception as e:
+        logger.warning("Error attempting self-enrolment: %s", e)
+
+    return False
+
+
 async def check_and_launch_secure_window_if_prompted(page=None) -> bool:
     """
     If on an attempt page that prompts to open a secure window or Safe Exam Browser,
