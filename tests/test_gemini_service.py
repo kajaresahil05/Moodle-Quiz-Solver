@@ -4,10 +4,8 @@ Tests for GeminiService response parsing and schema validation.
 Uses mocked Gemini outputs - does not consume API quota.
 """
 import json
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.models import GeminiAnswer, QuestionType, QuizOption
+from app.models import QuestionType, QuizOption
 from app.services.gemini_service import GeminiService
 
 
@@ -103,7 +101,7 @@ class TestParseResponse:
         # Pydantic will raise or clamp based on model config
         # We just test it doesn't crash
         try:
-            result = self.svc._parse_response(raw, self.options)
+            _ = self.svc._parse_response(raw, self.options)
         except Exception:
             pass  # Validation error is acceptable
 

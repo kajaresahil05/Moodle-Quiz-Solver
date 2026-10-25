@@ -42,8 +42,6 @@ def test_create_workflow_invalid_url(client):
 
 def test_create_workflow_valid(client, monkeypatch):
     """Test workflow creation with mocked browser."""
-    # Mock the workflow start to avoid actual browser launch
-    import asyncio
     from app.models import WorkflowRecord, WorkflowState, WorkflowMode
     from datetime import datetime
     
@@ -114,8 +112,6 @@ def test_workflow_mode_validation(client):
 def test_user_isolation_api(client):
     """Ensure user only sees their own workflows and cannot access others."""
     from app import database as db
-    from app.services import auth_service
-    from app.main import app
     
     # Workflow created by other_user
     wf_other = db.create_workflow(

@@ -4,15 +4,17 @@ Google Gemini API integration for quiz answer suggestions.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
+import time
 from typing import List, Optional
+
+import httpx
 
 from app.config import get_settings
 from app.models import GeminiAnswer, QuizOption, QuestionType
-
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,6 @@ class GeminiService:
         2. Groq (fallback 1 / 14,400 daily requests)
         3. Ollama (fallback 2)
         """
-        global _gemini_daily_exhausted_until
         if not question_text.strip():
             return GeminiAnswer(is_ambiguous=True, explanation="Empty question text")
 
@@ -115,7 +116,6 @@ class GeminiService:
         for attempt in range(max_retries):
             try:
                 client = self._get_client()
-                import asyncio
                 loop = asyncio.get_event_loop()
                 response = await loop.run_in_executor(
                     None,
@@ -149,7 +149,6 @@ class GeminiService:
                     logger.warning(
                         "Gemini rate limit hit (429). Retrying in %.1fs...", wait_time
                     )
-                    import asyncio
                     await asyncio.sleep(wait_time)
                     continue
                 raise
@@ -290,7 +289,6 @@ Important rules:
 
     async def test_connection_detailed(self) -> tuple[bool, str]:
         """Test Gemini API connectivity with descriptive status message."""
-        import asyncio
         settings = get_settings()
         if not settings.gemini_configured:
             return False, "GEMINI_API_KEY is not configured in .env"
@@ -298,7 +296,7 @@ Important rules:
         model_name = settings.gemini_model or "gemini-3.5-flash"
         try:
             client = self._get_client()
-            response = await asyncio.to_thread(
+            await asyncio.to_thread(
                 client.models.generate_content,
                 model=model_name,
                 contents="Reply with OK",
@@ -318,7 +316,6 @@ Important rules:
         settings = get_settings()
         if not settings.groq_configured:
             return False, "Groq API key is not configured in .env"
-        import httpx
         try:
             headers = {"Authorization": f"Bearer {settings.groq_api_key}"}
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -332,7 +329,6 @@ Important rules:
     async def test_ollama(self) -> tuple[bool, str]:
         """Test local Ollama server connectivity."""
         settings = get_settings()
-        import httpx
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 res = await client.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags")
@@ -343,5 +339,5 @@ Important rules:
                         return True, f"Ollama online. Model '{settings.ollama_model}' is ready."
                     return True, f"Ollama online, but model '{settings.ollama_model}' is not pulled yet (run: ollama pull {settings.ollama_model})"
                 return False, f"Ollama returned HTTP {res.status_code}"
-        except Exception as e:
+        except Exception:
             return False, f"Ollama offline ({settings.ollama_base_url})"

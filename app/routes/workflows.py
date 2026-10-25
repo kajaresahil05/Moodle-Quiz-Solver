@@ -5,20 +5,17 @@ REST API routes for workflow management.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import List
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app import database as db
 from app.models import (
     StatusResponse,
     WorkflowCreate,
-    WorkflowMode,
     WorkflowRecord,
     WorkflowResponse,
     WorkflowState,
-    WorkflowUpdate,
 )
 from app.services import auth_service, workflow_service
 

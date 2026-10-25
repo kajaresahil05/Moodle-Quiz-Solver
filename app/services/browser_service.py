@@ -59,7 +59,7 @@ async def get_page():
 
 async def get_active_page():
     """Get the active browser page, switching to any quiz popup or newly opened tab if present."""
-    global _page, _context
+    global _page
     if _context and len(_context.pages) > 1:
         # Check if any open page is at an attempt, summary, or process URL
         for p in reversed(_context.pages):

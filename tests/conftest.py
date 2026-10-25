@@ -2,8 +2,6 @@
 tests/conftest.py
 Shared pytest fixtures for all tests.
 """
-import os
-import tempfile
 import pytest
 
 # Use an in-memory/temp database for tests
