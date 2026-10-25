@@ -9,6 +9,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/main.css?v=2.2">
+    <!-- PWA & Mobile Capabilities -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0e1a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="QuizAssist">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -113,6 +122,14 @@
                     <span>Sign Out</span>
                 </a>
                 {% endif %}
+                <button class="btn btn-ghost btn-sm btn-pwa-install hidden" id="pwa-install-btn" title="Install QuizAssist App" type="button">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>Install App</span>
+                </button>
                 <div class="notif-wrapper">
                     <button class="notif-bell" id="notif-bell" title="Notifications" aria-label="Notifications" type="button" style="background: none; border: none; cursor: pointer; color: inherit;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

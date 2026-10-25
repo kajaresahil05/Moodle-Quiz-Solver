@@ -279,3 +279,60 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// ─── PWA Service Worker & Install Flow ─────────────────────────
+let deferredPrompt = null;
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => {
+                console.log('[QuizAssist PWA] Service Worker registered:', reg.scope);
+            })
+            .catch(err => {
+                console.warn('[QuizAssist PWA] Service Worker registration failed:', err);
+            });
+    });
+}
+
+// Capture install prompt for PWA
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) {
+        installBtn.classList.remove('hidden');
+        installBtn.onclick = async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log('[QuizAssist PWA] User install choice:', outcome);
+            deferredPrompt = null;
+            installBtn.classList.add('hidden');
+        };
+    }
+});
+
+window.addEventListener('appinstalled', () => {
+    console.log('[QuizAssist PWA] App successfully installed!');
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) installBtn.classList.add('hidden');
+    if (typeof showToast === 'function') {
+        showToast('success', 'App Installed', 'QuizAssist is installed and ready to use offline!');
+    }
+});
+
+// Network status listeners
+window.addEventListener('online', () => {
+    if (typeof showToast === 'function') {
+        showToast('success', 'Back Online', 'Connection restored to QuizAssist server.');
+    }
+});
+
+window.addEventListener('offline', () => {
+    if (typeof showToast === 'function') {
+        showToast('warning', 'Offline Mode', 'Connection lost. Working from offline cache.');
+    }
+});
+

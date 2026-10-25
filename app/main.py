@@ -23,7 +23,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
@@ -106,6 +106,23 @@ def create_app() -> FastAPI:
     @app.get("/redoc", include_in_schema=False)
     async def redoc_redirect():
         return RedirectResponse(url="/api/redoc")
+
+    # PWA Endpoints
+    @app.get("/manifest.json", include_in_schema=False)
+    async def manifest():
+        return FileResponse("static/manifest.json", media_type="application/manifest+json")
+
+    @app.get("/sw.js", include_in_schema=False)
+    async def service_worker():
+        return FileResponse(
+            "static/sw.js",
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/"},
+        )
+
+    @app.get("/offline", include_in_schema=False)
+    async def offline():
+        return FileResponse("templates/offline.html", media_type="text/html")
 
     # Global exception handler
     @app.exception_handler(Exception)

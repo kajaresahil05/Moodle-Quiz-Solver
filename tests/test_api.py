@@ -148,3 +148,26 @@ def test_user_isolation_api(client):
     # 5. Detail page for own workflow should return 200
     page_mine = client.get(f"/workflow/{wf_mine.workflow_id}")
     assert page_mine.status_code == 200
+
+
+def test_pwa_manifest(client):
+    res = client.get("/manifest.json")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["name"] == "Moodle Quiz Assistant"
+    assert data["display"] == "standalone"
+    assert len(data["icons"]) >= 2
+
+
+def test_pwa_service_worker(client):
+    res = client.get("/sw.js")
+    assert res.status_code == 200
+    assert "application/javascript" in res.headers["content-type"]
+    assert res.headers.get("service-worker-allowed") == "/"
+
+
+def test_pwa_offline_page(client):
+    res = client.get("/offline")
+    assert res.status_code == 200
+    assert "You're Offline" in res.text
+
