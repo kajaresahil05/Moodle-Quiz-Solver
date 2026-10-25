@@ -112,7 +112,7 @@
                         </td>
                         <td>
                             <span class="badge badge--{{ 'blue' if wf.mode.value == 'practice' else 'purple' }}">
-                                {{ wf.mode.value }}
+                                {{ 'auto-answer' if wf.mode.value == 'practice' else wf.mode.value }}
                             </span>
                         </td>
                         <td>
@@ -232,8 +232,8 @@
                                     </svg>
                                 </div>
                                 <div class="mode-info">
-                                    <div class="mode-name">Practice Mode</div>
-                                    <div class="mode-desc">Automatically selects AI-suggested answers on ungraded quizzes</div>
+                                    <div class="mode-name">Auto-answer Mode</div>
+                                    <div class="mode-desc">Automatically selects AI-suggested answers</div>
                                 </div>
                             </div>
                         </label>
@@ -260,12 +260,11 @@
                         <input type="checkbox" id="auto-submit" name="auto_submit">
                         <span class="checkbox-custom"></span>
                         <span class="checkbox-text">
-                            Auto-submit after all questions answered
-                            <span class="badge badge--orange badge--sm">Practice only</span>
+                            Auto-submit quiz after all questions are answered
                         </span>
                     </label>
                     <span class="form-hint warning-hint">
-                        ⚠️ Only enable for authorized practice quizzes. Submission cannot be undone.
+                        ⚠️ Caution: Quiz submission cannot be undone. Only enable if you want the quiz submitted automatically upon completion.
                     </span>
                 </div>
 

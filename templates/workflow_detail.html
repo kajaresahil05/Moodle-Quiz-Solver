@@ -10,7 +10,7 @@
         <div>
             <h1>Workflow <span class="monospace">{{ workflow.workflow_id[:8] }}</span></h1>
             <div class="wf-meta">
-                <span class="badge badge--{{ 'blue' if workflow.mode.value == 'practice' else 'purple' }}">{{ workflow.mode.value }}</span>
+                <span class="badge badge--{{ 'blue' if workflow.mode.value == 'practice' else 'purple' }}">{{ 'auto-answer' if workflow.mode.value == 'practice' else workflow.mode.value }}</span>
                 <span class="status-badge status-{{ workflow.state.value }}" id="wf-state-badge">
                     {% if workflow.state.value == 'running' %}<span class="pulse-dot"></span>{% endif %}
                     {{ workflow.state.value }}
