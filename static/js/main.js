@@ -135,9 +135,31 @@ function initSidebarToggle() {
         }
     });
 
+    const closeBtn = document.getElementById('sidebar-close-btn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeSidebar();
+        });
+    }
+
     if (backdrop) {
         backdrop.addEventListener('click', closeSidebar);
     }
+
+    // Touch swipe-to-close for mobile sidebar
+    let touchStartX = 0;
+    sidebar.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].clientX;
+    }, { passive: true });
+
+    sidebar.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        if (touchStartX - touchEndX > 50) {
+            // Swiped left by at least 50px
+            closeSidebar();
+        }
+    }, { passive: true });
 
     // Close sidebar when clicking any navigation link on mobile
     sidebar.querySelectorAll('.sidebar-link').forEach(link => {

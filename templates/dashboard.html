@@ -100,22 +100,22 @@
                 <tbody>
                     {% for wf in workflows %}
                     <tr id="row-{{ wf.workflow_id }}" data-workflow-id="{{ wf.workflow_id }}">
-                        <td>
+                        <td data-label="ID">
                             <a href="/workflow/{{ wf.workflow_id }}" class="link-primary monospace">
                                 {{ wf.workflow_id[:8] }}...
                             </a>
                         </td>
-                        <td>
+                        <td data-label="Quiz URL">
                             <span class="url-text" title="{{ wf.quiz_url }}">
                                 {{ wf.quiz_url[:50] }}{% if wf.quiz_url|length > 50 %}...{% endif %}
                             </span>
                         </td>
-                        <td>
+                        <td data-label="Mode">
                             <span class="badge badge--{{ 'blue' if wf.mode.value == 'practice' else 'purple' }}">
                                 {{ 'auto-answer' if wf.mode.value == 'practice' else wf.mode.value }}
                             </span>
                         </td>
-                        <td>
+                        <td data-label="Status">
                             <span class="status-badge status-{{ wf.state.value }}" id="status-{{ wf.workflow_id }}">
                                 {% if wf.state.value == 'running' %}
                                 <span class="pulse-dot"></span>
@@ -123,7 +123,7 @@
                                 {{ wf.state.value }}
                             </span>
                         </td>
-                        <td>
+                        <td data-label="Progress">
                             <div class="progress-cell">
                                 <div class="progress-bar-mini">
                                     <div class="progress-fill"
@@ -135,15 +135,15 @@
                                 </span>
                             </div>
                         </td>
-                        <td>
+                        <td data-label="Created">
                             <span class="date-text" data-utc="{{ wf.created_at.isoformat() if wf.created_at else '' }}">{{ wf.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
                         </td>
-                        <td>
+                        <td data-label="Actions">
                             <div class="action-group">
                                 <a href="/workflow/{{ wf.workflow_id }}" class="btn btn-ghost btn-xs" title="View details">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                        <circle cx="12" cy="12" r="3"/>
+                                        <circle cx="12" cy="3" r="3"/>
                                     </svg>
                                 </a>
                                 {% if wf.state.value == 'running' %}
