@@ -109,3 +109,46 @@ def test_workflow_mode_validation(client):
         "mode": "invalid_mode",
     })
     assert res.status_code == 422
+
+
+def test_user_isolation_api(client):
+    """Ensure user only sees their own workflows and cannot access others."""
+    from app import database as db
+    from app.services import auth_service
+    from app.main import app
+    
+    # Workflow created by other_user
+    wf_other = db.create_workflow(
+        "https://example.com/quiz?attempt=999",
+        "practice",
+        user_id="other_student",
+    )
+    # Workflow created by current user test_student
+    wf_mine = db.create_workflow(
+        "https://example.com/quiz?attempt=888",
+        "practice",
+        user_id="test_student",
+    )
+
+    # 1. Listing workflows should only include test_student's workflows
+    res = client.get("/api/workflows")
+    assert res.status_code == 200
+    ids = [w["workflow_id"] for w in res.json()]
+    assert wf_mine.workflow_id in ids
+    assert wf_other.workflow_id not in ids
+
+    # 2. Accessing other user's workflow should return 404
+    res_other = client.get(f"/api/workflows/{wf_other.workflow_id}")
+    assert res_other.status_code == 404
+
+    # 3. Accessing own workflow should return 200
+    res_mine = client.get(f"/api/workflows/{wf_mine.workflow_id}")
+    assert res_mine.status_code == 200
+
+    # 4. Detail page for other user's workflow should return 404
+    page_other = client.get(f"/workflow/{wf_other.workflow_id}")
+    assert page_other.status_code == 404
+
+    # 5. Detail page for own workflow should return 200
+    page_mine = client.get(f"/workflow/{wf_mine.workflow_id}")
+    assert page_mine.status_code == 200

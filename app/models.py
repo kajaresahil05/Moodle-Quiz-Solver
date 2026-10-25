@@ -108,6 +108,7 @@ class WorkflowRecord(BaseModel):
     total_questions: int = 0
     answered_questions: int = 0
     submitted: bool = False
+    user_id: Optional[str] = None
 
 
 class WorkflowUpdate(BaseModel):

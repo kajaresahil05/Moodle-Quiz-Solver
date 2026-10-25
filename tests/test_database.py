@@ -131,3 +131,25 @@ def test_update_question_record_answered():
     updated_records = db.list_question_records(wf.workflow_id)
     assert updated_records[0].answered is True
 
+
+def test_user_workflow_isolation():
+    wf_user1 = db.create_workflow(
+        "https://example.com/quiz?attempt=10",
+        "practice",
+        user_id="user_alpha",
+    )
+    wf_user2 = db.create_workflow(
+        "https://example.com/quiz?attempt=20",
+        "practice",
+        user_id="user_beta",
+    )
+
+    user1_wfs = db.list_workflows(user_id="user_alpha")
+    user2_wfs = db.list_workflows(user_id="user_beta")
+
+    assert any(w.workflow_id == wf_user1.workflow_id for w in user1_wfs)
+    assert not any(w.workflow_id == wf_user2.workflow_id for w in user1_wfs)
+
+    assert any(w.workflow_id == wf_user2.workflow_id for w in user2_wfs)
+    assert not any(w.workflow_id == wf_user1.workflow_id for w in user2_wfs)
+

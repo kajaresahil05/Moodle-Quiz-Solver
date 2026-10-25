@@ -23,8 +23,11 @@ async def dashboard(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    workflows = db.list_workflows(limit=20)
-    notifications = notif.get_notifications(unread_only=False, limit=10)
+    moodle_id = user.get("moodle_id", "")
+    workflows = db.list_workflows(user_id=moodle_id if moodle_id else None, limit=20)
+    user_workflow_ids = {w.workflow_id for w in workflows}
+    all_notifs = notif.get_notifications(unread_only=False, limit=50)
+    notifications = [n for n in all_notifs if n.get("workflow_id") in user_workflow_ids][:10]
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -45,7 +48,7 @@ async def workflow_detail(request: Request, workflow_id: str):
         return RedirectResponse(url=f"/login?next=/workflow/{workflow_id}", status_code=status.HTTP_303_SEE_OTHER)
 
     workflow = db.get_workflow(workflow_id)
-    if not workflow:
+    if not workflow or (workflow.user_id and user.get("moodle_id") and workflow.user_id != user.get("moodle_id")):
         return templates.TemplateResponse(
             "error.html",
             {"request": request, "current_user": user, "message": "Workflow not found"},

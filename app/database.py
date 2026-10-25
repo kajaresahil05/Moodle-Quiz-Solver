@@ -74,7 +74,8 @@ def init_db() -> None:
                 error_message   TEXT,
                 total_questions INTEGER NOT NULL DEFAULT 0,
                 answered_questions INTEGER NOT NULL DEFAULT 0,
-                submitted       INTEGER NOT NULL DEFAULT 0
+                submitted       INTEGER NOT NULL DEFAULT 0,
+                user_id         TEXT
             );
 
             CREATE TABLE IF NOT EXISTS question_records (
@@ -118,11 +119,19 @@ def init_db() -> None:
                 ON events(workflow_id);
             CREATE INDEX IF NOT EXISTS idx_user_sessions_moodle_id
                 ON user_sessions(moodle_id);
+            CREATE INDEX IF NOT EXISTS idx_workflows_user_id
+                ON workflows(user_id);
         """)
 
-        # Migration: ensure ai_provider column exists
+        # Migration: ensure ai_provider column exists in question_records
         try:
             conn.execute("ALTER TABLE question_records ADD COLUMN ai_provider TEXT DEFAULT 'Gemini';")
+        except sqlite3.OperationalError:
+            pass  # Already exists
+
+        # Migration: ensure user_id column exists in workflows
+        try:
+            conn.execute("ALTER TABLE workflows ADD COLUMN user_id TEXT;")
         except sqlite3.OperationalError:
             pass  # Already exists
     logger.info("Database initialized at %s", _get_db_path())
@@ -134,6 +143,7 @@ def create_workflow(
     quiz_url: str,
     mode: str,
     auto_submit: bool = False,
+    user_id: Optional[str] = None,
 ) -> WorkflowRecord:
     now = _now_iso()
     wid = str(uuid.uuid4())
@@ -144,10 +154,10 @@ def create_workflow(
         conn.execute(
             """
             INSERT INTO workflows
-                (workflow_id, quiz_url, mode, state, auto_submit, created_at, updated_at)
-            VALUES (?, ?, ?, 'pending', ?, ?, ?)
+                (workflow_id, quiz_url, mode, state, auto_submit, created_at, updated_at, user_id)
+            VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)
             """,
-            (wid, sanitized_url, mode, int(auto_submit), now, now),
+            (wid, sanitized_url, mode, int(auto_submit), now, now, user_id),
         )
 
     return get_workflow(wid)  # type: ignore[return-value]
@@ -163,11 +173,17 @@ def get_workflow(workflow_id: str) -> Optional[WorkflowRecord]:
     return _row_to_workflow(row)
 
 
-def list_workflows(limit: int = 50) -> List[WorkflowRecord]:
+def list_workflows(user_id: Optional[str] = None, limit: int = 50) -> List[WorkflowRecord]:
     with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT * FROM workflows ORDER BY created_at DESC LIMIT ?", (limit,)
-        ).fetchall()
+        if user_id:
+            rows = conn.execute(
+                "SELECT * FROM workflows WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM workflows ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
     return [_row_to_workflow(r) for r in rows]
 
 
@@ -347,6 +363,7 @@ def _sanitize_url(url: str) -> str:
 
 
 def _row_to_workflow(row: sqlite3.Row) -> WorkflowRecord:
+    keys = row.keys()
     return WorkflowRecord(
         workflow_id=row["workflow_id"],
         quiz_url=row["quiz_url"],
@@ -359,6 +376,7 @@ def _row_to_workflow(row: sqlite3.Row) -> WorkflowRecord:
         total_questions=row["total_questions"],
         answered_questions=row["answered_questions"],
         submitted=bool(row["submitted"]),
+        user_id=row["user_id"] if "user_id" in keys else None,
     )
 
 

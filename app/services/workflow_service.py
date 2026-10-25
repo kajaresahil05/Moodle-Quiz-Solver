@@ -38,6 +38,7 @@ async def start_workflow(
     request: WorkflowCreate,
     moodle_username: str = "",
     moodle_password: str = "",
+    user_id: Optional[str] = None,
 ) -> WorkflowRecord:
     """
     Create a new workflow record and launch the background task.
@@ -48,10 +49,12 @@ async def start_workflow(
         raise ValueError(f"Invalid quiz URL: {err}")
 
     # Create DB record
+    owner_id = user_id or (moodle_username.strip() if moodle_username else None)
     record = db.create_workflow(
         quiz_url=request.quiz_url,
         mode=request.mode.value,
         auto_submit=request.auto_submit,
+        user_id=owner_id,
     )
 
     db.log_event(record.workflow_id, "workflow_created", f"Mode: {request.mode.value}")

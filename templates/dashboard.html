@@ -6,7 +6,7 @@
 <div class="dashboard-header">
     <div class="dashboard-title">
         <h1>Quiz Automation Dashboard</h1>
-        <p class="subtitle">AI-powered assistance for your Moodle quizzes</p>
+        <p class="subtitle">{% if current_user and current_user.moodle_id %}Personal workspace for Moodle ID: <strong>{{ current_user.moodle_id }}</strong>{% else %}AI-powered assistance for your Moodle quizzes{% endif %}</p>
     </div>
     <button class="btn btn-primary" id="new-workflow-btn" onclick="openNewWorkflowModal()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -72,7 +72,7 @@
 <!-- Workflows Table -->
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">Recent Workflows</h2>
+        <h2 class="card-title">Your Workflows</h2>
         <button class="btn btn-ghost btn-sm" onclick="refreshWorkflows()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"/>

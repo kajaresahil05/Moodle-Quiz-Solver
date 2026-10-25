@@ -35,6 +35,17 @@ def _format_iso(dt) -> str:
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
 
+def _get_workflow_for_request(workflow_id: str, http_req: Request) -> WorkflowRecord:
+    record = db.get_workflow(workflow_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    user = auth_service.get_current_user(http_req)
+    # If the workflow belongs to a specific user, ensure the requesting user matches
+    if record.user_id and user and user.get("moodle_id") and record.user_id != user.get("moodle_id"):
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return record
+
+
 @router.post("", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
 async def create_workflow(request: WorkflowCreate, http_req: Request):
     """
@@ -48,15 +59,24 @@ async def create_workflow(request: WorkflowCreate, http_req: Request):
         user = auth_service.get_current_user(http_req)
         moodle_username = user.get("moodle_id", "") if user else ""
         moodle_password = user.get("moodle_password", "") if user else ""
+        user_id = moodle_username or None
 
         try:
             record = await workflow_service.start_workflow(
                 request,
                 moodle_username=moodle_username,
                 moodle_password=moodle_password,
+                user_id=user_id,
             )
         except TypeError:
-            record = await workflow_service.start_workflow(request)
+            try:
+                record = await workflow_service.start_workflow(
+                    request,
+                    moodle_username=moodle_username,
+                    moodle_password=moodle_password,
+                )
+            except TypeError:
+                record = await workflow_service.start_workflow(request)
         return WorkflowResponse(
             success=True,
             workflow_id=record.workflow_id,
@@ -71,26 +91,23 @@ async def create_workflow(request: WorkflowCreate, http_req: Request):
 
 
 @router.get("", response_model=List[WorkflowRecord])
-async def list_workflows(limit: int = 20):
-    """List all workflows, most recent first."""
-    return db.list_workflows(limit=min(limit, 100))
+async def list_workflows(http_req: Request, limit: int = 20):
+    """List workflows for current user (or all if unauthenticated)."""
+    user = auth_service.get_current_user(http_req)
+    user_id = user.get("moodle_id") if user else None
+    return db.list_workflows(user_id=user_id, limit=min(limit, 100))
 
 
 @router.get("/{workflow_id}", response_model=WorkflowRecord)
-async def get_workflow(workflow_id: str):
+async def get_workflow(workflow_id: str, http_req: Request):
     """Get details of a specific workflow."""
-    record = db.get_workflow(workflow_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-    return record
+    return _get_workflow_for_request(workflow_id, http_req)
 
 
 @router.get("/{workflow_id}/status", response_model=StatusResponse)
-async def get_workflow_status(workflow_id: str):
+async def get_workflow_status(workflow_id: str, http_req: Request):
     """Get the current status of a workflow including events."""
-    record = db.get_workflow(workflow_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    record = _get_workflow_for_request(workflow_id, http_req)
     
     events = db.list_events(workflow_id, limit=20)
     questions = db.list_question_records(workflow_id)
@@ -131,11 +148,9 @@ async def get_workflow_status(workflow_id: str):
 
 
 @router.post("/{workflow_id}/stop", response_model=WorkflowResponse)
-async def stop_workflow(workflow_id: str):
+async def stop_workflow(workflow_id: str, http_req: Request):
     """Stop a running workflow."""
-    record = db.get_workflow(workflow_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    _get_workflow_for_request(workflow_id, http_req)
     
     stopped = await workflow_service.stop_workflow(workflow_id)
     if stopped:
@@ -152,8 +167,9 @@ async def stop_workflow(workflow_id: str):
 
 
 @router.delete("/{workflow_id}", response_model=WorkflowResponse)
-async def delete_workflow(workflow_id: str):
+async def delete_workflow(workflow_id: str, http_req: Request):
     """Delete a workflow and all associated records."""
+    _get_workflow_for_request(workflow_id, http_req)
     # Stop if running
     await workflow_service.stop_workflow(workflow_id)
     deleted = db.delete_workflow(workflow_id)
@@ -167,21 +183,17 @@ async def delete_workflow(workflow_id: str):
 
 
 @router.get("/{workflow_id}/questions")
-async def get_workflow_questions(workflow_id: str):
+async def get_workflow_questions(workflow_id: str, http_req: Request):
     """Get all question records for a workflow."""
-    record = db.get_workflow(workflow_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    _get_workflow_for_request(workflow_id, http_req)
     questions = db.list_question_records(workflow_id)
     return {"workflow_id": workflow_id, "questions": [q.model_dump() for q in questions]}
 
 
 @router.get("/{workflow_id}/events")
-async def get_workflow_events(workflow_id: str, limit: int = 50):
+async def get_workflow_events(workflow_id: str, http_req: Request, limit: int = 50):
     """Get event log for a workflow."""
-    record = db.get_workflow(workflow_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    _get_workflow_for_request(workflow_id, http_req)
     events = db.list_events(workflow_id, limit=min(limit, 200))
     return {
         "workflow_id": workflow_id,

@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app import database as db
 from app.config import get_settings
+from app.services import auth_service
 from app.services.gemini_service import GeminiService
 from app.services import notification_service as notif
 
@@ -80,17 +82,24 @@ async def test_ollama():
 
 @router.get("/notifications")
 async def get_notifications(
+    http_req: Request,
     workflow_id: str = None,
     unread_only: bool = False,
     limit: int = 50,
 ):
     """Get notifications for the dashboard."""
+    user = auth_service.get_current_user(http_req)
+    notifications = notif.get_notifications(
+        workflow_id=workflow_id,
+        unread_only=unread_only,
+        limit=min(limit, 100),
+    )
+    if user and user.get("moodle_id") and not workflow_id:
+        user_wfs = db.list_workflows(user_id=user["moodle_id"])
+        user_wf_ids = {w.workflow_id for w in user_wfs}
+        notifications = [n for n in notifications if n.get("workflow_id") in user_wf_ids]
     return {
-        "notifications": notif.get_notifications(
-            workflow_id=workflow_id,
-            unread_only=unread_only,
-            limit=min(limit, 100),
-        )
+        "notifications": notifications
     }
 
 
