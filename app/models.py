@@ -89,11 +89,10 @@ class WorkflowCreate(BaseModel):
     @field_validator("quiz_url")
     @classmethod
     def validate_quiz_url(cls, v: str) -> str:
-        v = v.strip()
+        v = v.strip().strip('"').strip("'").strip()
         # Must be http/https
         if not v.startswith(("http://", "https://")):
             raise ValueError("quiz_url must start with http:// or https://")
-        # Must not contain obviously sensitive query params but we cannot know cookies
         return v
 
 

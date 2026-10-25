@@ -324,12 +324,12 @@ def list_events(workflow_id: str, limit: int = 100) -> List[EventRecord]:
 def _sanitize_url(url: str) -> str:
     """Remove query parameters that may contain session data. Keep base path."""
     from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
-    parsed = urlparse(url)
-    # Keep only safe query params (attempt, cmid, page) — drop sesskey, token etc.
-    safe_keys = {"attempt", "cmid", "page", "id"}
+    parsed = urlparse(url.strip().strip('"').strip("'"))
+    # Keep only safe query params (attempt, cmid, page, id, q, forceview, showall) — drop sesskey, token etc.
+    safe_keys = {"attempt", "cmid", "page", "id", "q", "forceview", "showall"}
     qs = parse_qs(parsed.query, keep_blank_values=False)
     safe_qs = {k: v for k, v in qs.items() if k in safe_keys}
-    sanitized = parsed._replace(query=urlencode(safe_qs, doseq=True))
+    sanitized = parsed._replace(query=urlencode(safe_qs, doseq=True), fragment="")
     return urlunparse(sanitized)
 
 

@@ -45,3 +45,32 @@ async def test_empty_url_rejected():
 async def test_valid_https():
     ok, err = await validate_quiz_url("https://moodle.college.edu/mod/quiz/attempt.php?attempt=99")
     assert ok is True
+
+
+@pytest.mark.asyncio
+async def test_view_url_accepted():
+    ok, err = await validate_quiz_url("https://elearn.apsit.edu.in/moodle/mod/quiz/view.php?id=78208")
+    assert ok is True
+    assert err == ""
+
+
+@pytest.mark.asyncio
+async def test_quoted_and_whitespace_url_accepted():
+    ok, err = await validate_quiz_url('  "https://moodle.college.edu/mod/quiz/view.php?id=123"  ')
+    assert ok is True
+    assert err == ""
+
+
+@pytest.mark.asyncio
+async def test_startattempt_url_accepted():
+    ok, err = await validate_quiz_url("https://elearn.apsit.edu.in/moodle/mod/quiz/startattempt.php?cmid=78208")
+    assert ok is True
+    assert err == ""
+
+
+@pytest.mark.asyncio
+async def test_summary_url_accepted():
+    ok, err = await validate_quiz_url("https://elearn.apsit.edu.in/moodle/mod/quiz/summary.php?attempt=185199&cmid=78208")
+    assert ok is True
+    assert err == ""
+

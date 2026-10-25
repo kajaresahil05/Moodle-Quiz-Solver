@@ -109,12 +109,19 @@ async def _run_workflow(
     """Main workflow execution logic."""
     try:
         db.update_workflow(workflow_id, WorkflowUpdate(state=WorkflowState.RUNNING))
-        await notif.notify_workflow_started(workflow_id, request.quiz_url)
-        db.log_event(workflow_id, "workflow_started", "Navigating to quiz URL")
+        clean_url = request.quiz_url.strip().strip('"').strip("'")
+        if "#" in clean_url:
+            clean_url = clean_url.split("#")[0]
+        # If the user copied a mid-quiz URL (e.g. &page=3), start from beginning page=0 so all questions are answered
+        if "/mod/quiz/attempt.php" in clean_url and "page=" in clean_url:
+            clean_url = re.sub(r'([?&])page=\d+', r'\g<1>page=0', clean_url)
+
+        await notif.notify_workflow_started(workflow_id, clean_url)
+        db.log_event(workflow_id, "workflow_started", f"Navigating to quiz URL: {clean_url}")
 
         # Navigate to quiz
-        page = await browser_service.get_page()
-        await browser_service.navigate_to(request.quiz_url)
+        page = await browser_service.get_active_page()
+        await browser_service.navigate_to(clean_url)
         await asyncio.sleep(2)  # Brief pause for page settle
 
         # Check login
@@ -127,10 +134,12 @@ async def _run_workflow(
                 logged_in = await browser_service.perform_login(active_user, active_pwd, page)
                 if logged_in:
                     db.log_event(workflow_id, "info", "Auto-login succeeded")
+                    page = await browser_service.get_active_page()
                     # If not on quiz page after login, navigate back to quiz URL
                     if not await browser_service.check_is_moodle_quiz(page):
-                        await browser_service.navigate_to(request.quiz_url)
+                        await browser_service.navigate_to(clean_url)
                         await asyncio.sleep(2)
+                        page = await browser_service.get_active_page()
                 else:
                     db.update_workflow(workflow_id, WorkflowUpdate(
                         state=WorkflowState.FAILED,
@@ -148,11 +157,25 @@ async def _run_workflow(
                 db.log_event(workflow_id, "error", "Login required - user must log in to Moodle")
                 return
 
-        # If currently on a view page, attempt to start/continue the quiz
+        # If currently on a view page, course page, or start page, attempt to start/continue the quiz
         await browser_service.check_and_start_attempt_if_view_page(page)
+        page = await browser_service.get_active_page()
 
-        # Check it's actually an active quiz attempt or summary page
-        if not await browser_service.check_is_moodle_quiz(page):
+        # Check for secure window launch prompt if present
+        await browser_service.check_and_launch_secure_window_if_prompted(page)
+        page = await browser_service.get_active_page()
+
+        # Check it's actually an active quiz attempt or summary page (retry briefly for slow redirects)
+        is_quiz = await browser_service.check_is_moodle_quiz(page)
+        if not is_quiz:
+            for _ in range(4):
+                await asyncio.sleep(1)
+                page = await browser_service.get_active_page()
+                if await browser_service.check_is_moodle_quiz(page):
+                    is_quiz = True
+                    break
+
+        if not is_quiz:
             try:
                 body_text = await page.inner_text("body")
             except Exception:
@@ -160,10 +183,18 @@ async def _run_workflow(
 
             if "No more attempts are allowed" in body_text or "Your final grade for this quiz" in body_text:
                 error_msg = "Quiz attempt already completed/finished. No active attempts remaining for this quiz."
+            elif "review.php" in page.url:
+                error_msg = "Quiz attempt is already completed/finished (review URL provided)."
+            elif "closed on" in body_text.lower() or "quiz closed" in body_text.lower():
+                error_msg = "Quiz has already closed and is no longer accepting attempts."
+            elif "not be available until" in body_text.lower() or "not currently available" in body_text.lower():
+                error_msg = "Quiz is not currently open for attempts (scheduled for a future time)."
+            elif "password" in body_text.lower() and ("required" in body_text.lower() or "enter" in body_text.lower()):
+                error_msg = "Quiz requires a password to attempt."
             elif "/mod/quiz/view.php" in page.url:
                 error_msg = "Quiz has not been started yet or is not currently open for attempts."
             else:
-                error_msg = f"URL redirected to {page.url[:80]} - not a Moodle quiz attempt page"
+                error_msg = f"URL redirected to {page.url[:80]} - not an active Moodle quiz attempt page"
 
             db.update_workflow(workflow_id, WorkflowUpdate(
                 state=WorkflowState.FAILED,
@@ -182,6 +213,7 @@ async def _run_workflow(
             # Check for cancellation
             await asyncio.sleep(0)  # Yield to event loop
 
+            page = await browser_service.get_active_page()
             current_url = page.url
 
             # Check if we've reached the summary page
@@ -239,6 +271,7 @@ async def _run_workflow(
             await asyncio.sleep(1)
 
         # Handle summary page and auto-submit
+        page = await browser_service.get_active_page()
         await _handle_completion(workflow_id, request, page, total_answered, total_questions_count)
 
     except asyncio.CancelledError:
