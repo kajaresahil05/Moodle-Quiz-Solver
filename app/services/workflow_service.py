@@ -123,16 +123,36 @@ async def _run_workflow(
         await notif.notify_workflow_started(workflow_id, clean_url)
         db.log_event(workflow_id, "workflow_started", f"Navigating to quiz URL: {clean_url}")
 
-        # Navigate to quiz
+        # Check and prepare login credentials
+        settings = get_settings()
+        active_user = moodle_username or settings.moodle_username
+        active_pwd = moodle_password or settings.moodle_password
+
         page = await browser_service.get_active_page()
+
+        # Step 1: Pre-authenticate if user credentials are provided
+        if active_user and active_pwd:
+            db.log_event(workflow_id, "info", f"Authenticating Moodle session as {active_user}...")
+            logged_in = await browser_service.ensure_moodle_login(active_user, active_pwd, clean_url, page)
+            if not logged_in:
+                error_msg = f"Automatic login failed for Moodle user '{active_user}'. Please verify your credentials."
+                db.update_workflow(workflow_id, WorkflowUpdate(
+                    state=WorkflowState.FAILED,
+                    error_message=error_msg
+                ))
+                await notif.notify_login_required(workflow_id)
+                db.log_event(workflow_id, "error", error_msg)
+                return
+            db.log_event(workflow_id, "info", f"Successfully authenticated as {active_user}")
+            page = await browser_service.get_active_page()
+
+        # Step 2: Navigate to quiz URL
         await browser_service.navigate_to(clean_url)
         await asyncio.sleep(2)  # Brief pause for page settle
+        page = await browser_service.get_active_page()
 
-        # Check login
+        # Step 3: Check if redirected to a login page or not authenticated
         if await browser_service.check_login_required(page):
-            settings = get_settings()
-            active_user = moodle_username or settings.moodle_username
-            active_pwd = moodle_password or settings.moodle_password
             if active_user and active_pwd:
                 db.log_event(workflow_id, "info", f"Login required - attempting auto-login as {active_user}")
                 logged_in = await browser_service.perform_login(active_user, active_pwd, page)
@@ -161,14 +181,25 @@ async def _run_workflow(
                 db.log_event(workflow_id, "error", "Login required - user must log in to Moodle")
                 return
 
-        # If currently on an enrolment page, attempt self-enrolment
+        # If currently on an enrolment page:
         if "/enrol/" in page.url:
-            enrolled = await browser_service.check_and_handle_course_enrolment(page)
-            if enrolled:
-                db.log_event(workflow_id, "info", "Self-enrolment submitted, navigating to quiz")
-                await browser_service.navigate_to(clean_url)
-                await asyncio.sleep(2)
-                page = await browser_service.get_active_page()
+            # Check if reached unauthenticated
+            if not await browser_service.is_authenticated_in_moodle(page) and active_user and active_pwd:
+                db.log_event(workflow_id, "info", f"Enrolment page reached unauthenticated; logging in as {active_user}")
+                logged_in = await browser_service.ensure_moodle_login(active_user, active_pwd, clean_url, page)
+                if logged_in:
+                    await browser_service.navigate_to(clean_url)
+                    await asyncio.sleep(2)
+                    page = await browser_service.get_active_page()
+
+            # Attempt self-enrolment if still on enrolment page
+            if "/enrol/" in page.url:
+                enrolled = await browser_service.check_and_handle_course_enrolment(page)
+                if enrolled:
+                    db.log_event(workflow_id, "info", "Self-enrolment submitted, navigating to quiz")
+                    await browser_service.navigate_to(clean_url)
+                    await asyncio.sleep(2)
+                    page = await browser_service.get_active_page()
 
         # If currently on a view page, course page, or start page, attempt to start/continue the quiz
         await browser_service.check_and_start_attempt_if_view_page(page)
@@ -201,12 +232,13 @@ async def _run_workflow(
             elif "/enrol/" in page.url:
                 course_match = re.search(r'[?&]id=(\d+)', page.url)
                 cid = f"Course #{course_match.group(1)}" if course_match else "this course"
+                user_label = f"account '{active_user}'" if active_user else "account"
                 if "cannot enrol" in body_text.lower():
-                    error_msg = f"Course enrolment required: Your Moodle account is not enrolled in {cid}, and self-enrolment is not allowed. Please contact your instructor or verify your Moodle credentials."
+                    error_msg = f"Course enrolment required: Your Moodle {user_label} is not enrolled in {cid}, and self-enrolment is not allowed. Please contact your instructor or verify your Moodle credentials."
                 elif "enrolment key" in body_text.lower() or "password" in body_text.lower():
                     error_msg = f"Course enrolment key required: {cid} requires an enrolment key. Please enrol in the course first in Moodle."
                 else:
-                    error_msg = f"Course enrolment required: Your logged-in Moodle account is not enrolled in {cid}. Please enrol in the course first or check your Moodle credentials."
+                    error_msg = f"Course enrolment required: Your logged-in Moodle {user_label} is not enrolled in {cid}. Please enrol in the course first or check your Moodle credentials."
             elif "closed on" in body_text.lower() or "quiz closed" in body_text.lower():
                 error_msg = "Quiz has already closed and is no longer accepting attempts."
             elif "not be available until" in body_text.lower() or "not currently available" in body_text.lower():

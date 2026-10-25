@@ -20,6 +20,7 @@ _playwright_instance = None
 _browser = None
 _context = None
 _page = None
+_current_moodle_user: Optional[str] = None
 _lock = asyncio.Lock()
 
 
@@ -147,7 +148,7 @@ async def _initialize_browser() -> None:
 
 async def close_browser() -> None:
     """Close the browser and clean up resources."""
-    global _playwright_instance, _browser, _context, _page
+    global _playwright_instance, _browser, _context, _page, _current_moodle_user
     async with _lock:
         if _page and not _page.is_closed():
             await _page.close()
@@ -161,6 +162,7 @@ async def close_browser() -> None:
         _context = None
         _browser = None
         _playwright_instance = None
+        _current_moodle_user = None
     logger.info("Browser closed")
 
 
@@ -177,13 +179,147 @@ async def navigate_to(url: str, wait_for: str = "domcontentloaded", timeout_ms: 
     logger.info("Navigated to: %s", url[:100])
 
 
+def extract_moodle_base_url(url: str) -> str:
+    """Extract Moodle root URL from any Moodle URL."""
+    clean = url.strip().strip('"').strip("'")
+    parsed = urlparse(clean)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    path = parsed.path.rstrip("/")
+    path_parts = [p for p in path.split("/") if p]
+    if path_parts and path_parts[0].lower() in ("moodle", "lms", "elearning", "learn"):
+        base += f"/{path_parts[0]}"
+    return base
+
+
+async def clear_browser_session() -> None:
+    """Clear cookies and close non-primary pages for a fresh session."""
+    global _context, _page, _current_moodle_user
+    _current_moodle_user = None
+    if _context:
+        try:
+            await _context.clear_cookies()
+        except Exception as e:
+            logger.warning("Error clearing cookies: %s", e)
+        # Close extra tabs / popups from previous runs
+        if len(_context.pages) > 1:
+            for p in list(_context.pages)[1:]:
+                try:
+                    if not p.is_closed():
+                        await p.close()
+                except Exception:
+                    pass
+        if _context.pages:
+            _page = _context.pages[0]
+
+
+async def is_authenticated_in_moodle(page=None) -> bool:
+    """Check if the current browser page has an authenticated Moodle user session."""
+    if page is None:
+        page = await get_active_page()
+    url = page.url.lower()
+
+    # If explicitly on login page, not authenticated
+    if any(kw in url for kw in ["/login/", "login.php"]):
+        return False
+
+    try:
+        # 1. Check Moodle's JS config object window.M.cfg.userId
+        user_id = await page.evaluate(
+            "() => (window.M && window.M.cfg && window.M.cfg.userId !== undefined) ? window.M.cfg.userId : null"
+        )
+        if user_id is not None:
+            try:
+                uid_int = int(user_id)
+                if uid_int > 1:
+                    return True
+                elif uid_int in (0, 1):
+                    return False
+            except (ValueError, TypeError):
+                pass
+    except Exception:
+        pass
+
+    try:
+        # 2. Check for explicit login links / indicators
+        login_indicators = await page.query_selector(
+            '.logininfo a[href*="login"], a[href*="/login/index.php"], .usermenu a[href*="login"]'
+        )
+        if login_indicators and await login_indicators.is_visible():
+            return False
+
+        # 3. Check for presence of user menu, avatar, or profile link
+        has_user_element = await page.query_selector(
+            '.usermenu, .usertext, a[href*="/user/profile.php"], .userbutton, .userpicture'
+        )
+        if has_user_element:
+            return True
+
+        # 4. Check body text for unauthenticated strings
+        body_text = await page.inner_text("body")
+        if "you are not logged in" in body_text.lower():
+            return False
+    except Exception:
+        pass
+
+    return False
+
+
+async def get_logged_in_moodle_user(page=None) -> Optional[str]:
+    """Retrieve username/full name of currently logged-in Moodle user, if visible."""
+    if page is None:
+        page = await get_active_page()
+    try:
+        fullname = await page.evaluate(
+            "() => (window.M && window.M.cfg && window.M.cfg.userfullname) ? window.M.cfg.userfullname : null"
+        )
+        if fullname:
+            return str(fullname).strip()
+
+        el = await page.query_selector(".usertext, .usermenu .userbutton, .userbutton")
+        if el:
+            txt = await el.inner_text()
+            if txt:
+                return txt.strip()
+    except Exception:
+        pass
+    return None
+
+
 async def check_login_required(page=None) -> bool:
-    """Check if the current page is a login page."""
+    """Check if the current page indicates that user login is required."""
     if page is None:
         page = await get_page()
-    url = page.url
-    return any(kw in url for kw in ["login", "signin", "auth"]) or \
-           await page.query_selector('form[action*="login"]') is not None
+    url = page.url.lower()
+
+    # 1. URL keywords
+    if any(kw in url for kw in ["/login/", "login.php", "signin", "auth"]):
+        return True
+
+    # 2. Login form or username/password inputs
+    try:
+        if await page.query_selector('form[action*="login"]') is not None:
+            return True
+        user_field = await page.query_selector('#username, input[name="username"]')
+        pwd_field = await page.query_selector('#password, input[name="password"]')
+        if user_field and pwd_field and await user_field.is_visible():
+            return True
+    except Exception:
+        pass
+
+    # 3. Explicit "You are not logged in"
+    try:
+        body_text = await page.inner_text("body")
+        if "you are not logged in" in body_text.lower():
+            return True
+    except Exception:
+        pass
+
+    # 4. Unauthenticated on an enrolment page or view page
+    if "/enrol/" in url or "/mod/quiz/view.php" in url:
+        if not await is_authenticated_in_moodle(page):
+            return True
+
+    return False
 
 
 async def perform_login(username: str, password: str, page=None) -> bool:
@@ -241,16 +377,77 @@ async def perform_login(username: str, password: str, page=None) -> bool:
         except Exception:
             await asyncio.sleep(3)
 
-        # Check if we are still on login page
-        still_login = await check_login_required(page)
-        if still_login:
-            logger.warning("Still on login page after submitting credentials")
+        # Check for visible login error banners
+        login_err = await page.query_selector(".loginerrors, #loginerrormessage, .alert-danger")
+        if login_err and await login_err.is_visible():
+            err_text = await login_err.inner_text()
+            logger.warning("Moodle login error message detected: %s", err_text.strip())
             return False
 
-        logger.info("Moodle login successful")
+        # Check if we are still on login page
+        curr_url = page.url.lower()
+        if any(kw in curr_url for kw in ["/login/", "login.php", "signin", "auth"]):
+            has_form = await page.query_selector('form[action*="login"], #username')
+            if has_form and await has_form.is_visible():
+                logger.warning("Still on login page after submitting credentials")
+                return False
+
+        logger.info("Moodle login successful for user %s", username)
         return True
     except Exception as e:
         logger.error("Error during automatic Moodle login: %s", e)
+        return False
+
+
+async def ensure_moodle_login(
+    username: str,
+    password: str,
+    base_or_quiz_url: str,
+    page=None,
+) -> bool:
+    """
+    Ensure the browser is logged in to Moodle as the specified user.
+    If already logged in as that user, does nothing and returns True.
+    If not logged in, or logged in as a different user, clears session and logs in.
+    """
+    global _current_moodle_user
+    if page is None:
+        page = await get_active_page()
+
+    clean_user = username.strip()
+    if not clean_user or not password:
+        return False
+
+    base_url = extract_moodle_base_url(base_or_quiz_url)
+    login_url = f"{base_url}/login/index.php"
+
+    # If we already logged in as this user in this session, verify if still alive
+    if _current_moodle_user == clean_user:
+        is_auth = await is_authenticated_in_moodle(page)
+        if is_auth:
+            logger.info("Already authenticated in Moodle as %s", clean_user)
+            return True
+
+    logger.info("Ensuring Moodle login for user %s (clearing cookies)", clean_user)
+    await clear_browser_session()
+
+    page = await get_active_page()
+    await page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
+    await asyncio.sleep(1)
+
+    # If already logged in after navigation (e.g. server-side session), check
+    if await is_authenticated_in_moodle(page):
+        _current_moodle_user = clean_user
+        logger.info("Moodle session already active as %s", clean_user)
+        return True
+
+    success = await perform_login(clean_user, password, page)
+    if success:
+        _current_moodle_user = clean_user
+        logger.info("Successfully authenticated to Moodle as %s", clean_user)
+        return True
+    else:
+        logger.error("Failed to authenticate to Moodle as %s", clean_user)
         return False
 
 
