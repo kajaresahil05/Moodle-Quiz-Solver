@@ -736,11 +736,14 @@ ul { list-style: none; }
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+    align-items: stretch;
 }
 
 .mode-card {
     cursor: pointer;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .mode-card input[type="radio"] { display: none; }
@@ -754,6 +757,13 @@ ul { list-style: none; }
     border: 2px solid var(--border-color);
     border-radius: var(--radius-md);
     transition: all var(--transition);
+    height: 100%;
+    flex: 1;
+    box-sizing: border-box;
+}
+
+.mode-info {
+    flex: 1;
 }
 
 .mode-card input:checked + .mode-card-content {
