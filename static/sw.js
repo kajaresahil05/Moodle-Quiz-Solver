@@ -3,7 +3,7 @@
  * Version: 1.0.1
  */
 
-const CACHE_NAME = 'quizassist-v1.0.1';
+const CACHE_NAME = 'quizassist-v1.0.2';
 
 const PRECACHE_ASSETS = [
     '/offline',
