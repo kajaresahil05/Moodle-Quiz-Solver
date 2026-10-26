@@ -1,9 +1,9 @@
 /**
  * QuizAssist PWA Service Worker
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
-const CACHE_NAME = 'quizassist-v1.0.0';
+const CACHE_NAME = 'quizassist-v1.0.1';
 
 const PRECACHE_ASSETS = [
     '/offline',
@@ -11,6 +11,7 @@ const PRECACHE_ASSETS = [
     '/static/js/main.js',
     '/static/icons/icon-192.png',
     '/static/icons/icon-512.png',
+    '/static/icons/favicon.png',
     '/static/icons/icon.svg',
     '/manifest.json'
 ];
