@@ -124,6 +124,10 @@ def create_app() -> FastAPI:
     async def offline():
         return FileResponse("templates/offline.html", media_type="text/html")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        return FileResponse("static/favicon.ico", media_type="image/x-icon")
+
     # Global exception handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):

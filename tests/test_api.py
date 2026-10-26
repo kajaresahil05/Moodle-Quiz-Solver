@@ -171,3 +171,10 @@ def test_pwa_offline_page(client):
     assert res.status_code == 200
     assert "You're Offline" in res.text
 
+
+def test_favicon(client):
+    res = client.get("/favicon.ico")
+    assert res.status_code == 200
+    assert "image/x-icon" in res.headers["content-type"]
+
+
